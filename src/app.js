@@ -2,6 +2,7 @@ import express from "express";
 
 import urlRoutes from "./routes/url.routes.js";
 import { redirectController } from "./controllers/redirect.controller.js";
+import { errorMiddleware } from "./middleware/error.middleware.js";
 
 const app = express();
 
@@ -17,5 +18,8 @@ app.get("/:shortCode", redirectController);
 
 // URL shortening API routes
 app.use("/api/v1/urls", urlRoutes);
+
+// Centralized error handling (must be last)
+app.use(errorMiddleware);
 
 export default app;

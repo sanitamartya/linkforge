@@ -3,13 +3,13 @@ import { createUrl } from "../services/url.service.js";
 
 export async function createUrlController(req, res) {
   // Validate incoming request body.
-  const validation = createUrlSchema.safeParse(req.body);
+  const validation = createUrlSchema.safeParse(req.body ?? {});
 
   if (!validation.success) {
     return res.status(400).json({
       error: {
         code: "VALIDATION_ERROR",
-        message: "Please provide a valid HTTP or HTTPS URL.",
+        message: validation.error.issues[0].message,
         details: validation.error.issues.map((issue) => ({
           field: issue.path.join("."),
           message: issue.message,
