@@ -4,3 +4,11 @@ coverage/
 logs/
 *.log
 .DS_Store
+
+/src/generated/prisma
+
+# Prisma-generated AI agent skills
+/.agents/
+/.claude/
+/.windsurf/
+/skills-lock.json
