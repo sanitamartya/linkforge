@@ -4,9 +4,15 @@ import { redis } from "./config/redis.js";
 const PORT = process.env.PORT || 3000;
 
 async function startServer() {
-  await redis.connect();
-
-  console.log("Redis connected successfully.");
+  try {
+    await redis.connect();
+    console.log("Redis connected successfully.");
+  } catch (error) {
+    console.warn(
+      "Redis is unavailable. Continuing without cache.",
+      error.message,
+    );
+  }
 
   app.listen(PORT, () => {
     console.log(`LinkForge server running on port ${PORT}`);
