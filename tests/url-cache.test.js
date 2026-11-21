@@ -61,3 +61,52 @@ test("URL lookup should cache database results and serve cache hits", async () =
     await prisma.$disconnect();
   }
 });
+
+test("URL lookup should fall back to PostgreSQL when Redis is unavailable", async () => {
+  let url;
+
+  try {
+    if (!redis.isOpen) {
+      await redis.connect();
+    }
+
+    // Create a database record for this test.
+    url = await createUrl("https://example.com/redis-fallback");
+
+    const cacheKey = `url:${url.shortCode}`;
+
+    // Ensure the cache does not contain this URL.
+    await redis.del(cacheKey);
+
+    // Simulate Redis being unavailable to the application.
+    await redis.disconnect();
+
+    // The service should skip Redis and query PostgreSQL.
+    const result = await getUrlByShortCode(url.shortCode);
+
+    assert.equal(result.originalUrl, "https://example.com/redis-fallback");
+  } finally {
+    // Reconnect Redis so the test environment is restored.
+    if (!redis.isOpen) {
+      await redis.connect();
+    }
+
+    if (url) {
+      await redis.del(`url:${url.shortCode}`).catch(() => {});
+
+      await prisma.url
+        .delete({
+          where: {
+            id: url.id,
+          },
+        })
+        .catch(() => {});
+    }
+
+    if (redis.isOpen) {
+      await redis.quit();
+    }
+
+    await prisma.$disconnect();
+  }
+});
