@@ -21,5 +21,19 @@ services:
       timeout: 5s
       retries: 5
 
+  redis:
+    image: redis:7-alpine
+    container_name: linkforge-redis
+    restart: unless-stopped
+
+    ports:
+      - "127.0.0.1:6379:6379"
+
+    command: ["redis-server", "--appendonly", "yes"]
+
+    volumes:
+      - linkforge_redis_data:/data
+
 volumes:
   linkforge_postgres_data:
+  linkforge_redis_data:
