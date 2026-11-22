@@ -1,25 +1,26 @@
 import app from "./app.js";
 import { redis } from "./config/redis.js";
+import { logger } from "./config/logger.js";
 
 const PORT = process.env.PORT || 3000;
 
 async function startServer() {
   try {
     await redis.connect();
-    console.log("Redis connected successfully.");
+    logger.info("Redis connected successfully.");
   } catch (error) {
-    console.warn(
+    logger.warn(
+      { err: error },
       "Redis is unavailable. Continuing without cache.",
-      error.message,
     );
   }
 
   app.listen(PORT, () => {
-    console.log(`LinkForge server running on port ${PORT}`);
+    logger.info({ port: PORT }, "LinkForge server started");
   });
 }
 
 startServer().catch((error) => {
-  console.error("Failed to start LinkForge:", error);
+  logger.fatal({ err: error }, "Failed to start LinkForge");
   process.exit(1);
 });

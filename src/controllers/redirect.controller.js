@@ -1,4 +1,5 @@
 import { getUrlByShortCode } from "../services/url.service.js";
+import { logger } from "../config/logger.js";
 
 export async function redirectController(req, res) {
   try {
@@ -17,7 +18,7 @@ export async function redirectController(req, res) {
 
     return res.redirect(302, url.originalUrl);
   } catch (error) {
-    console.error("URL redirect failed:", error);
+    logger.error({ err: error }, "URL redirect failed");
 
     return res.status(500).json({
       error: {

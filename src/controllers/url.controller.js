@@ -1,5 +1,6 @@
 import { createUrlSchema } from "../schemas/url.schema.js";
 import { createUrl } from "../services/url.service.js";
+import { logger } from "../config/logger.js";
 
 export async function createUrlController(req, res) {
   // Validate incoming request body.
@@ -34,7 +35,7 @@ export async function createUrlController(req, res) {
     });
   } catch (error) {
     // Don't expose internal database errors to clients.
-    console.error("URL creation failed:", error);
+    logger.error({ err: error }, "URL creation failed");
 
     return res.status(500).json({
       error: {

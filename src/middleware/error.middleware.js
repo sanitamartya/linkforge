@@ -1,3 +1,5 @@
+import { logger } from "../config/logger.js";
+
 export function errorMiddleware(error, req, res, next) {
   // Handle malformed JSON sent by the client.
   if (error instanceof SyntaxError && error.status === 400 && "body" in error) {
@@ -10,7 +12,7 @@ export function errorMiddleware(error, req, res, next) {
   }
 
   // Handle unexpected server errors.
-  console.error("Unhandled application error:", error);
+  logger.error({ err: error }, "Unhandled application error");
 
   return res.status(500).json({
     error: {
