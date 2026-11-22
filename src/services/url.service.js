@@ -4,8 +4,7 @@ import { redis } from "../config/redis.js";
 import { logger } from "../config/logger.js";
 
 const MAX_RETRIES = 5;
-
-export async function createUrl(originalUrl) {
+export async function createUrl(originalUrl, userId) {
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     const shortCode = generateShortCode();
 
@@ -14,6 +13,7 @@ export async function createUrl(originalUrl) {
         data: {
           originalUrl,
           shortCode,
+          userId,
         },
       });
 

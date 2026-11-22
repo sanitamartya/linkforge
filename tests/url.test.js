@@ -1,4 +1,5 @@
 import test, { after } from "node:test";
+import { randomUUID } from "node:crypto";
 import assert from "node:assert/strict";
 import request from "supertest";
 
@@ -6,7 +7,14 @@ import app from "../src/app.js";
 import { prisma } from "../src/config/database.js";
 import { createAccessToken } from "../src/utils/jwt.js";
 
-const testAccessToken = await createAccessToken("linkforge-test-user");
+const testUser = await prisma.user.create({
+  data: {
+    email: `linkforge-url-tests-${randomUUID()}@example.com`,
+    passwordHash: "test-only-password-hash",
+  },
+});
+
+const testAccessToken = await createAccessToken(testUser.id);
 
 function createUrlRequest() {
   return request(app)
@@ -15,6 +23,18 @@ function createUrlRequest() {
 }
 
 after(async () => {
+  await prisma.url.deleteMany({
+    where: {
+      userId: testUser.id,
+    },
+  });
+
+  await prisma.user.delete({
+    where: {
+      id: testUser.id,
+    },
+  });
+
   await prisma.$disconnect();
 });
 
@@ -58,7 +78,18 @@ test("POST /api/v1/urls should create a short URL and redirect correctly", async
 
     assert.ok(Number.isFinite(Date.parse(createResponse.body.createdAt)));
 
+    // IMPORTANT: Store the created URL's ID for DB assertions and cleanup.
     createdUrlId = createResponse.body.id;
+
+    // Verify that the URL is saved in PostgreSQL and belongs to the authenticated user.
+    const savedUrl = await prisma.url.findUnique({
+      where: {
+        id: createdUrlId,
+      },
+    });
+
+    assert.ok(savedUrl, "URL should exist in PostgreSQL");
+    assert.equal(savedUrl.userId, testUser.id);
 
     // Verify the short URL redirects correctly.
     const redirectResponse = await request(app)
@@ -68,6 +99,7 @@ test("POST /api/v1/urls should create a short URL and redirect correctly", async
 
     assert.equal(redirectResponse.status, 302);
     assert.match(redirectResponse.headers["content-type"], /text\/plain/);
+
     assert.equal(
       redirectResponse.headers.location,
       "https://example.com/integration-test",
@@ -83,6 +115,7 @@ test("POST /api/v1/urls should create a short URL and redirect correctly", async
     assert.ok(clickEvent, "Click event should be recorded");
 
     assert.equal(clickEvent.referrer, "https://example.com/source");
+
     assert.equal(clickEvent.userAgent, "LinkForge-Integration-Test");
   } finally {
     // Remove the test record from PostgreSQL.

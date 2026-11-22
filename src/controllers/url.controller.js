@@ -20,7 +20,7 @@ export async function createUrlController(req, res) {
   }
 
   try {
-    const url = await createUrl(validation.data.originalUrl);
+    const url = await createUrl(validation.data.originalUrl, req.user.id);
 
     const baseUrl = process.env.APP_BASE_URL || "http://localhost:3000";
 
