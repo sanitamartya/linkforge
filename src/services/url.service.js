@@ -99,3 +99,86 @@ export async function listUrlsForUser(userId) {
     },
   });
 }
+
+export async function updateUrlForUser({ urlId, userId, originalUrl }) {
+  const existingUrl = await prisma.url.findFirst({
+    where: {
+      id: urlId,
+      userId,
+    },
+    select: {
+      id: true,
+      shortCode: true,
+    },
+  });
+
+  if (!existingUrl) {
+    return null;
+  }
+
+  const updatedUrl = await prisma.url.update({
+    where: {
+      id: existingUrl.id,
+    },
+    data: {
+      originalUrl,
+    },
+  });
+
+  // Remove the old cached URL so the next redirect
+  // reads the updated destination from PostgreSQL.
+  if (redis.isReady) {
+    try {
+      await redis.del(`url:${existingUrl.shortCode}`);
+    } catch (error) {
+      logger.error(
+        { err: error, shortCode: existingUrl.shortCode },
+        "Redis cache invalidation failed",
+      );
+    }
+  }
+
+  return updatedUrl;
+}
+
+export async function deleteUrlForUser({ urlId, userId }) {
+  // First, verify that this URL belongs to the user.
+  const existingUrl = await prisma.url.findFirst({
+    where: {
+      id: urlId,
+      userId,
+    },
+    select: {
+      id: true,
+      shortCode: true,
+    },
+  });
+
+  // Return null if the URL doesn't exist
+  // or belongs to another user.
+  if (!existingUrl) {
+    return null;
+  }
+
+  // Delete the URL from PostgreSQL.
+  await prisma.url.delete({
+    where: {
+      id: existingUrl.id,
+    },
+  });
+
+  // Remove the cached URL so it cannot be used
+  // for future redirects.
+  if (redis.isReady) {
+    try {
+      await redis.del(`url:${existingUrl.shortCode}`);
+    } catch (error) {
+      logger.error(
+        { err: error, shortCode: existingUrl.shortCode },
+        "Redis cache invalidation failed",
+      );
+    }
+  }
+
+  return existingUrl;
+}

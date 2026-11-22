@@ -8,3 +8,12 @@ export const createUrlSchema = z.strictObject({
     })
     .trim(),
 });
+
+export const updateUrlSchema = z.strictObject({
+  originalUrl: z
+    .url({
+      protocol: /^https?$/,
+      error: "Please provide a valid HTTP or HTTPS URL.",
+    })
+    .trim(),
+});

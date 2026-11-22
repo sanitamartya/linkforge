@@ -57,7 +57,6 @@ test("POST /api/v1/urls should create a short URL and redirect correctly", async
   let createdUrlId;
 
   try {
-    // Create a short URL using a valid access token.
     const createResponse = await createUrlRequest().send({
       originalUrl: "https://example.com/integration-test",
     });
@@ -84,10 +83,8 @@ test("POST /api/v1/urls should create a short URL and redirect correctly", async
 
     assert.ok(Number.isFinite(Date.parse(createResponse.body.createdAt)));
 
-    // IMPORTANT: Store the created URL's ID for DB assertions and cleanup.
     createdUrlId = createResponse.body.id;
 
-    // Verify that the URL is saved in PostgreSQL and belongs to the authenticated user.
     const savedUrl = await prisma.url.findUnique({
       where: {
         id: createdUrlId,
@@ -97,7 +94,6 @@ test("POST /api/v1/urls should create a short URL and redirect correctly", async
     assert.ok(savedUrl, "URL should exist in PostgreSQL");
     assert.equal(savedUrl.userId, testUser.id);
 
-    // Verify the short URL redirects correctly.
     const redirectResponse = await request(app)
       .get(`/${createResponse.body.shortCode}`)
       .set("Referer", "https://example.com/source")
@@ -111,7 +107,6 @@ test("POST /api/v1/urls should create a short URL and redirect correctly", async
       "https://example.com/integration-test",
     );
 
-    // Verify that the click event was saved in PostgreSQL.
     const clickEvent = await prisma.clickEvent.findFirst({
       where: {
         urlId: createdUrlId,
@@ -119,12 +114,9 @@ test("POST /api/v1/urls should create a short URL and redirect correctly", async
     });
 
     assert.ok(clickEvent, "Click event should be recorded");
-
     assert.equal(clickEvent.referrer, "https://example.com/source");
-
     assert.equal(clickEvent.userAgent, "LinkForge-Integration-Test");
   } finally {
-    // Remove the test record from PostgreSQL.
     if (createdUrlId) {
       await prisma.url.delete({
         where: {
@@ -314,4 +306,253 @@ test("GET /api/v1/urls should return only URLs owned by the authenticated user",
       },
     });
   }
+});
+
+test("PATCH /api/v1/urls/:id should reject a missing access token", async () => {
+  const url = await prisma.url.create({
+    data: {
+      originalUrl: "https://example.com/no-token-update",
+      shortCode: `nt${randomUUID().slice(0, 4)}`,
+      userId: testUser.id,
+    },
+  });
+
+  const response = await request(app).patch(`/api/v1/urls/${url.id}`).send({
+    originalUrl: "https://example.com/updated",
+  });
+
+  assert.equal(response.status, 401);
+  assert.equal(response.body.error.code, "UNAUTHORIZED");
+});
+
+test("PATCH /api/v1/urls/:id should update a URL owned by the user", async () => {
+  const url = await prisma.url.create({
+    data: {
+      originalUrl: "https://example.com/before-update",
+      shortCode: `up${randomUUID().slice(0, 4)}`,
+      userId: testUser.id,
+    },
+  });
+
+  const response = await request(app)
+    .patch(`/api/v1/urls/${url.id}`)
+    .set("Authorization", `Bearer ${testAccessToken}`)
+    .send({
+      originalUrl: "https://example.com/after-update",
+    });
+
+  assert.equal(response.status, 200);
+  assert.equal(response.body.originalUrl, "https://example.com/after-update");
+  assert.equal(response.body.shortCode, url.shortCode);
+
+  const updatedUrl = await prisma.url.findUnique({
+    where: {
+      id: url.id,
+    },
+  });
+
+  assert.equal(updatedUrl.originalUrl, "https://example.com/after-update");
+});
+
+test("PATCH /api/v1/urls/:id should reject an invalid URL", async () => {
+  const url = await prisma.url.create({
+    data: {
+      originalUrl: "https://example.com/valid",
+      shortCode: `iv${randomUUID().slice(0, 4)}`,
+      userId: testUser.id,
+    },
+  });
+
+  const response = await request(app)
+    .patch(`/api/v1/urls/${url.id}`)
+    .set("Authorization", `Bearer ${testAccessToken}`)
+    .send({
+      originalUrl: "ftp://example.com",
+    });
+
+  assert.equal(response.status, 400);
+  assert.equal(response.body.message, "Invalid URL input");
+  assert.ok(response.body.errors.fieldErrors.originalUrl);
+});
+
+test("PATCH /api/v1/urls/:id should not update another user's URL", async () => {
+  const otherUser = await prisma.user.create({
+    data: {
+      email: `linkforge-patch-owner-${randomUUID()}@example.com`,
+      passwordHash: "test-only-password-hash",
+    },
+  });
+
+  let urlId;
+
+  try {
+    const url = await prisma.url.create({
+      data: {
+        originalUrl: "https://example.com/other-owner",
+        shortCode: `oo${randomUUID().slice(0, 4)}`,
+        userId: otherUser.id,
+      },
+    });
+
+    urlId = url.id;
+
+    const response = await request(app)
+      .patch(`/api/v1/urls/${url.id}`)
+      .set("Authorization", `Bearer ${testAccessToken}`)
+      .send({
+        originalUrl: "https://example.com/should-not-update",
+      });
+
+    assert.equal(response.status, 404);
+
+    const savedUrl = await prisma.url.findUnique({
+      where: {
+        id: url.id,
+      },
+    });
+
+    assert.equal(savedUrl.originalUrl, "https://example.com/other-owner");
+  } finally {
+    if (urlId) {
+      await prisma.url.delete({
+        where: {
+          id: urlId,
+        },
+      });
+    }
+
+    await prisma.user.delete({
+      where: {
+        id: otherUser.id,
+      },
+    });
+  }
+});
+
+test("DELETE /api/v1/urls/:id should reject a missing access token", async () => {
+  const url = await prisma.url.create({
+    data: {
+      originalUrl: "https://example.com/delete-no-token",
+      shortCode: `dn${randomUUID().slice(0, 4)}`,
+      userId: testUser.id,
+    },
+  });
+
+  const response = await request(app).delete(`/api/v1/urls/${url.id}`);
+
+  assert.equal(response.status, 401);
+  assert.equal(response.body.error.code, "UNAUTHORIZED");
+});
+
+test("DELETE /api/v1/urls/:id should delete the user's URL", async () => {
+  const url = await prisma.url.create({
+    data: {
+      originalUrl: "https://example.com/delete-me",
+      shortCode: `de${randomUUID().slice(0, 4)}`,
+      userId: testUser.id,
+    },
+  });
+
+  await prisma.clickEvent.create({
+    data: {
+      urlId: url.id,
+      referrer: "https://example.com",
+      userAgent: "LinkForge-Delete-Test",
+    },
+  });
+
+  // Populate Redis cache before deleting.
+  const redirectBeforeDelete = await request(app).get(`/${url.shortCode}`);
+
+  assert.equal(redirectBeforeDelete.status, 302);
+
+  const response = await request(app)
+    .delete(`/api/v1/urls/${url.id}`)
+    .set("Authorization", `Bearer ${testAccessToken}`);
+
+  assert.equal(response.status, 204);
+  assert.equal(response.text, "");
+
+  const deletedUrl = await prisma.url.findUnique({
+    where: {
+      id: url.id,
+    },
+  });
+
+  assert.equal(deletedUrl, null);
+
+  const deletedClickEvent = await prisma.clickEvent.findFirst({
+    where: {
+      urlId: url.id,
+    },
+  });
+
+  assert.equal(deletedClickEvent, null);
+
+  // Deleted short URL should no longer redirect.
+  const redirectAfterDelete = await request(app).get(`/${url.shortCode}`);
+
+  assert.equal(redirectAfterDelete.status, 404);
+});
+
+test("DELETE /api/v1/urls/:id should not delete another user's URL", async () => {
+  const otherUser = await prisma.user.create({
+    data: {
+      email: `linkforge-delete-owner-${randomUUID()}@example.com`,
+      passwordHash: "test-only-password-hash",
+    },
+  });
+
+  let urlId;
+
+  try {
+    const url = await prisma.url.create({
+      data: {
+        originalUrl: "https://example.com/another-owner",
+        shortCode: `do${randomUUID().slice(0, 4)}`,
+        userId: otherUser.id,
+      },
+    });
+
+    urlId = url.id;
+
+    const response = await request(app)
+      .delete(`/api/v1/urls/${url.id}`)
+      .set("Authorization", `Bearer ${testAccessToken}`);
+
+    assert.equal(response.status, 404);
+    assert.equal(response.body.message, "URL not found");
+
+    const savedUrl = await prisma.url.findUnique({
+      where: {
+        id: url.id,
+      },
+    });
+
+    assert.ok(savedUrl);
+    assert.equal(savedUrl.userId, otherUser.id);
+  } finally {
+    if (urlId) {
+      await prisma.url.delete({
+        where: {
+          id: urlId,
+        },
+      });
+    }
+
+    await prisma.user.delete({
+      where: {
+        id: otherUser.id,
+      },
+    });
+  }
+});
+
+test("DELETE /api/v1/urls/:id should return 404 for an unknown URL", async () => {
+  const response = await request(app)
+    .delete(`/api/v1/urls/unknown-${randomUUID()}`)
+    .set("Authorization", `Bearer ${testAccessToken}`);
+
+  assert.equal(response.status, 404);
+  assert.equal(response.body.message, "URL not found");
 });
