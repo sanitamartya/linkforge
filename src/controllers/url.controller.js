@@ -1,5 +1,7 @@
 import { createUrlSchema } from "../schemas/url.schema.js";
-import { createUrl } from "../services/url.service.js";
+
+import { createUrl, listUrlsForUser } from "../services/url.service.js";
+
 import { logger } from "../config/logger.js";
 
 export async function createUrlController(req, res) {
@@ -41,6 +43,25 @@ export async function createUrlController(req, res) {
       error: {
         code: "INTERNAL_SERVER_ERROR",
         message: "Unable to create short URL.",
+      },
+    });
+  }
+}
+
+export async function listUrlsController(req, res) {
+  try {
+    const urls = await listUrlsForUser(req.user.id);
+
+    return res.status(200).json({
+      urls,
+    });
+  } catch (error) {
+    logger.error({ err: error }, "URL listing failed");
+
+    return res.status(500).json({
+      error: {
+        code: "INTERNAL_SERVER_ERROR",
+        message: "Unable to retrieve URLs.",
       },
     });
   }

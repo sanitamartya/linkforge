@@ -22,6 +22,12 @@ function createUrlRequest() {
     .set("Authorization", `Bearer ${testAccessToken}`);
 }
 
+function listUrlsRequest() {
+  return request(app)
+    .get("/api/v1/urls")
+    .set("Authorization", `Bearer ${testAccessToken}`);
+}
+
 after(async () => {
   await prisma.url.deleteMany({
     where: {
@@ -246,4 +252,66 @@ test("POST /api/v1/urls should accept an HTTP URL", async () => {
       id: response.body.id,
     },
   });
+});
+
+test("GET /api/v1/urls should reject a missing access token", async () => {
+  const response = await request(app).get("/api/v1/urls");
+
+  assert.equal(response.status, 401);
+  assert.equal(response.body.error.code, "UNAUTHORIZED");
+});
+
+test("GET /api/v1/urls should return only URLs owned by the authenticated user", async () => {
+  const otherUser = await prisma.user.create({
+    data: {
+      email: `linkforge-other-user-${randomUUID()}@example.com`,
+      passwordHash: "test-only-password-hash",
+    },
+  });
+
+  let otherUrlId;
+
+  try {
+    const ownUrl = await prisma.url.create({
+      data: {
+        originalUrl: "https://example.com/my-url",
+        shortCode: `my${randomUUID().slice(0, 4)}`,
+        userId: testUser.id,
+      },
+    });
+
+    const otherUrl = await prisma.url.create({
+      data: {
+        originalUrl: "https://example.com/other-user-url",
+        shortCode: `ot${randomUUID().slice(0, 4)}`,
+        userId: otherUser.id,
+      },
+    });
+
+    otherUrlId = otherUrl.id;
+
+    const response = await listUrlsRequest();
+
+    assert.equal(response.status, 200);
+    assert.ok(Array.isArray(response.body.urls));
+
+    const returnedIds = response.body.urls.map((url) => url.id);
+
+    assert.ok(returnedIds.includes(ownUrl.id));
+    assert.ok(!returnedIds.includes(otherUrl.id));
+  } finally {
+    if (otherUrlId) {
+      await prisma.url.delete({
+        where: {
+          id: otherUrlId,
+        },
+      });
+    }
+
+    await prisma.user.delete({
+      where: {
+        id: otherUser.id,
+      },
+    });
+  }
 });

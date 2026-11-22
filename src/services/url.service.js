@@ -82,3 +82,20 @@ export async function recordClickEvent({ urlId, referrer, userAgent }) {
     },
   });
 }
+
+export async function listUrlsForUser(userId) {
+  return prisma.url.findMany({
+    where: {
+      userId,
+    },
+    orderBy: {
+      createdAt: "desc",
+    },
+    select: {
+      id: true,
+      shortCode: true,
+      originalUrl: true,
+      createdAt: true,
+    },
+  });
+}
