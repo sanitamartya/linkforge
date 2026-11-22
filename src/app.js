@@ -1,10 +1,17 @@
 import express from "express";
+import pinoHttp from "pino-http";
+import { logger } from "./config/logger.js";
 
 import urlRoutes from "./routes/url.routes.js";
 import { redirectController } from "./controllers/redirect.controller.js";
 import { errorMiddleware } from "./middleware/error.middleware.js";
 
 const app = express();
+app.use(
+  pinoHttp({
+    logger,
+  }),
+);
 
 app.use(express.json());
 
