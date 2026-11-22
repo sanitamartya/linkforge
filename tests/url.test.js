@@ -4,17 +4,35 @@ import request from "supertest";
 
 import app from "../src/app.js";
 import { prisma } from "../src/config/database.js";
+import { createAccessToken } from "../src/utils/jwt.js";
+
+const testAccessToken = await createAccessToken("linkforge-test-user");
+
+function createUrlRequest() {
+  return request(app)
+    .post("/api/v1/urls")
+    .set("Authorization", `Bearer ${testAccessToken}`);
+}
 
 after(async () => {
   await prisma.$disconnect();
+});
+
+test("POST /api/v1/urls should reject a missing access token", async () => {
+  const response = await request(app).post("/api/v1/urls").send({
+    originalUrl: "https://example.com/no-token",
+  });
+
+  assert.equal(response.status, 401);
+  assert.equal(response.body.error.code, "UNAUTHORIZED");
 });
 
 test("POST /api/v1/urls should create a short URL and redirect correctly", async () => {
   let createdUrlId;
 
   try {
-    // Create a short URL.
-    const createResponse = await request(app).post("/api/v1/urls").send({
+    // Create a short URL using a valid access token.
+    const createResponse = await createUrlRequest().send({
       originalUrl: "https://example.com/integration-test",
     });
 
@@ -65,7 +83,6 @@ test("POST /api/v1/urls should create a short URL and redirect correctly", async
     assert.ok(clickEvent, "Click event should be recorded");
 
     assert.equal(clickEvent.referrer, "https://example.com/source");
-
     assert.equal(clickEvent.userAgent, "LinkForge-Integration-Test");
   } finally {
     // Remove the test record from PostgreSQL.
@@ -80,18 +97,14 @@ test("POST /api/v1/urls should create a short URL and redirect correctly", async
 });
 
 test("POST /api/v1/urls should reject an invalid URL", async () => {
-  const response = await request(app).post("/api/v1/urls").send({
+  const response = await createUrlRequest().send({
     originalUrl: "ftp://example.com",
   });
 
   assert.equal(response.status, 400);
-
   assert.equal(response.body.error.code, "VALIDATION_ERROR");
-
   assert.ok(response.body.error.message);
-
   assert.equal(response.body.error.details[0].field, "originalUrl");
-
   assert.ok(response.body.error.details[0].message);
 });
 
@@ -109,8 +122,7 @@ test("GET /:shortCode should return 404 for an unknown short code", async () => 
 });
 
 test("POST /api/v1/urls should reject malformed JSON", async () => {
-  const response = await request(app)
-    .post("/api/v1/urls")
+  const response = await createUrlRequest()
     .set("Content-Type", "application/json")
     .send('{"originalUrl":"https://example.com"');
 
@@ -125,7 +137,7 @@ test("POST /api/v1/urls should reject malformed JSON", async () => {
 });
 
 test("POST /api/v1/urls should reject a missing originalUrl", async () => {
-  const response = await request(app).post("/api/v1/urls").send({});
+  const response = await createUrlRequest().send({});
 
   assert.equal(response.status, 400);
   assert.equal(response.body.error.code, "VALIDATION_ERROR");
@@ -133,9 +145,10 @@ test("POST /api/v1/urls should reject a missing originalUrl", async () => {
 });
 
 test("POST /api/v1/urls should reject an empty request body", async () => {
-  const response = await request(app)
-    .post("/api/v1/urls")
-    .set("Content-Type", "application/json");
+  const response = await createUrlRequest().set(
+    "Content-Type",
+    "application/json",
+  );
 
   assert.equal(response.status, 400);
   assert.equal(response.body.error.code, "VALIDATION_ERROR");
@@ -143,7 +156,7 @@ test("POST /api/v1/urls should reject an empty request body", async () => {
 });
 
 test("POST /api/v1/urls should reject unexpected fields", async () => {
-  const response = await request(app).post("/api/v1/urls").send({
+  const response = await createUrlRequest().send({
     originalUrl: "https://example.com",
     isAdmin: true,
     role: "admin",
@@ -151,12 +164,11 @@ test("POST /api/v1/urls should reject unexpected fields", async () => {
 
   assert.equal(response.status, 400);
   assert.equal(response.body.error.code, "VALIDATION_ERROR");
-
   assert.match(response.body.error.message, /Unrecognized keys/);
 });
 
 test("POST /api/v1/urls should accept a URL with surrounding whitespace", async () => {
-  const response = await request(app).post("/api/v1/urls").send({
+  const response = await createUrlRequest().send({
     originalUrl: " https://example.com ",
   });
 
@@ -171,7 +183,7 @@ test("POST /api/v1/urls should accept a URL with surrounding whitespace", async 
 });
 
 test("POST /api/v1/urls should reject a URL without a protocol", async () => {
-  const response = await request(app).post("/api/v1/urls").send({
+  const response = await createUrlRequest().send({
     originalUrl: "example.com",
   });
 
@@ -180,7 +192,7 @@ test("POST /api/v1/urls should reject a URL without a protocol", async () => {
 });
 
 test("POST /api/v1/urls should reject an empty URL", async () => {
-  const response = await request(app).post("/api/v1/urls").send({
+  const response = await createUrlRequest().send({
     originalUrl: "",
   });
 
@@ -189,7 +201,7 @@ test("POST /api/v1/urls should reject an empty URL", async () => {
 });
 
 test("POST /api/v1/urls should accept an HTTP URL", async () => {
-  const response = await request(app).post("/api/v1/urls").send({
+  const response = await createUrlRequest().send({
     originalUrl: "http://example.com",
   });
 
