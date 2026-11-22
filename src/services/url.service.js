@@ -1,6 +1,7 @@
 import { prisma } from "../config/database.js";
 import { generateShortCode } from "../utils/short-code.js";
 import { redis } from "../config/redis.js";
+import { logger } from "../config/logger.js";
 
 const MAX_RETRIES = 5;
 
@@ -49,7 +50,7 @@ export async function getUrlByShortCode(shortCode) {
         return JSON.parse(cachedUrl);
       }
     } catch (error) {
-      console.error("Redis cache read failed:", error);
+      logger.error({ err: error, shortCode }, "Redis cache read failed");
     }
   }
 
@@ -65,7 +66,7 @@ export async function getUrlByShortCode(shortCode) {
     try {
       await redis.setEx(cacheKey, URL_CACHE_TTL_SECONDS, JSON.stringify(url));
     } catch (error) {
-      console.error("Redis cache write failed:", error);
+      logger.error({ err: error, shortCode }, "Redis cache write failed");
     }
   }
 
