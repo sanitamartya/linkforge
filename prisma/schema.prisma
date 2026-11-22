@@ -8,6 +8,16 @@ datasource db {
   provider = "postgresql"
 }
 
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  urls Url[]
+}
+
 model Url {
   id          String   @id @default(cuid())
   shortCode   String   @unique
@@ -15,9 +25,13 @@ model Url {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
+  userId String?
+  user   User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
   clickEvents ClickEvent[]
 
   @@index([createdAt])
+  @@index([userId])
 }
 
 model ClickEvent {
