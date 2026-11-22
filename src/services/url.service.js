@@ -72,3 +72,13 @@ export async function getUrlByShortCode(shortCode) {
 
   return url;
 }
+
+export async function recordClickEvent({ urlId, referrer, userAgent }) {
+  return prisma.clickEvent.create({
+    data: {
+      urlId,
+      referrer: referrer || null,
+      userAgent: userAgent || null,
+    },
+  });
+}

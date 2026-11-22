@@ -43,9 +43,10 @@ test("POST /api/v1/urls should create a short URL and redirect correctly", async
     createdUrlId = createResponse.body.id;
 
     // Verify the short URL redirects correctly.
-    const redirectResponse = await request(app).get(
-      `/${createResponse.body.shortCode}`,
-    );
+    const redirectResponse = await request(app)
+      .get(`/${createResponse.body.shortCode}`)
+      .set("Referer", "https://example.com/source")
+      .set("User-Agent", "LinkForge-Integration-Test");
 
     assert.equal(redirectResponse.status, 302);
     assert.match(redirectResponse.headers["content-type"], /text\/plain/);
@@ -53,6 +54,19 @@ test("POST /api/v1/urls should create a short URL and redirect correctly", async
       redirectResponse.headers.location,
       "https://example.com/integration-test",
     );
+
+    // Verify that the click event was saved in PostgreSQL.
+    const clickEvent = await prisma.clickEvent.findFirst({
+      where: {
+        urlId: createdUrlId,
+      },
+    });
+
+    assert.ok(clickEvent, "Click event should be recorded");
+
+    assert.equal(clickEvent.referrer, "https://example.com/source");
+
+    assert.equal(clickEvent.userAgent, "LinkForge-Integration-Test");
   } finally {
     // Remove the test record from PostgreSQL.
     if (createdUrlId) {

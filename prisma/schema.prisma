@@ -15,5 +15,19 @@ model Url {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
+  clickEvents ClickEvent[]
+
   @@index([createdAt])
+}
+
+model ClickEvent {
+  id        String   @id @default(cuid())
+  urlId     String
+  clickedAt DateTime @default(now())
+  referrer  String?  @db.Text
+  userAgent String?  @db.Text
+
+  url Url @relation(fields: [urlId], references: [id], onDelete: Cascade)
+
+  @@index([urlId, clickedAt])
 }

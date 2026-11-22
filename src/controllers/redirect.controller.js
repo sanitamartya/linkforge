@@ -1,4 +1,7 @@
-import { getUrlByShortCode } from "../services/url.service.js";
+import {
+  getUrlByShortCode,
+  recordClickEvent,
+} from "../services/url.service.js";
 import { logger } from "../config/logger.js";
 
 export async function redirectController(req, res) {
@@ -14,6 +17,19 @@ export async function redirectController(req, res) {
           message: "The requested short URL does not exist.",
         },
       });
+    }
+
+    try {
+      await recordClickEvent({
+        urlId: url.id,
+        referrer: req.get("referer"),
+        userAgent: req.get("user-agent"),
+      });
+    } catch (error) {
+      logger.error(
+        { err: error, shortCode },
+        "Failed to record URL click event",
+      );
     }
 
     return res.redirect(302, url.originalUrl);
