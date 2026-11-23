@@ -6,7 +6,8 @@
   "scripts": {
     "test": "node --import=tsx --test",
     "start": "node --import=tsx src/server.js",
-    "dev": "node --import=tsx --watch src/server.js"
+    "dev": "node --import=tsx --watch src/server.js",
+    "test:coverage": "node --experimental-test-coverage --import=tsx --test"
   },
   "keywords": [],
   "author": "",
