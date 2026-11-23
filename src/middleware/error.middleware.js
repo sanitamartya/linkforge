@@ -11,6 +11,16 @@ export function errorMiddleware(error, req, res, next) {
     });
   }
 
+  // Handle JSON request bodies that exceed the configured limit.
+  if (error.type === "entity.too.large" || error.status === 413) {
+    return res.status(413).json({
+      error: {
+        code: "PAYLOAD_TOO_LARGE",
+        message: "Request body is too large.",
+      },
+    });
+  }
+
   // Handle unexpected server errors.
   logger.error({ err: error }, "Unhandled application error");
 

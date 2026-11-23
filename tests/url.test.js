@@ -186,6 +186,21 @@ test("POST /api/v1/urls should reject an empty request body", async () => {
   assert.equal(response.body.error.details[0].field, "originalUrl");
 });
 
+test("POST /api/v1/urls should reject an oversized JSON body", async () => {
+  const response = await createUrlRequest().send({
+    originalUrl: `https://example.com/${"a".repeat(20_000)}`,
+  });
+
+  assert.equal(response.status, 413);
+
+  assert.deepEqual(response.body, {
+    error: {
+      code: "PAYLOAD_TOO_LARGE",
+      message: "Request body is too large.",
+    },
+  });
+});
+
 test("POST /api/v1/urls should reject unexpected fields", async () => {
   const response = await createUrlRequest().send({
     originalUrl: "https://example.com",

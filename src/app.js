@@ -1,20 +1,30 @@
 import express from "express";
+import helmet from "helmet";
 import pinoHttp from "pino-http";
-import { logger } from "./config/logger.js";
 
+import { logger } from "./config/logger.js";
 import urlRoutes from "./routes/url.routes.js";
 import { redirectController } from "./controllers/redirect.controller.js";
 import { errorMiddleware } from "./middleware/error.middleware.js";
 import authRoutes from "./routes/auth.routes.js";
 
 const app = express();
+
 app.use(
   pinoHttp({
     logger,
   }),
 );
 
-app.use(express.json());
+// Add standard HTTP security headers.
+app.use(helmet());
+
+// Reject oversized JSON requests with a 413 response.
+app.use(
+  express.json({
+    limit: "16kb",
+  }),
+);
 
 app.get("/health", (req, res) => {
   res.status(200).json({
