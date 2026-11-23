@@ -70,6 +70,7 @@ services:
       DATABASE_URL: ${DATABASE_URL_DOCKER:?Add DATABASE_URL_DOCKER to .env}
       REDIS_URL: redis://redis:6379
       JWT_SECRET: ${JWT_SECRET:?Add JWT_SECRET to .env}
+      APP_BASE_URL: ${APP_BASE_URL:-http://localhost:3000}
 
     depends_on:
       db:

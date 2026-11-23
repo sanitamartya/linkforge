@@ -10,4 +10,8 @@ if (!jwtSecret || Buffer.byteLength(jwtSecret) < 32) {
 
 export const env = {
   jwtSecret,
+  appBaseUrl: (process.env.APP_BASE_URL || "http://localhost:3000").replace(
+    /\/+$/,
+    "",
+  ),
 };

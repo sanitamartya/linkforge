@@ -8,6 +8,7 @@ import {
 } from "../services/url.service.js";
 
 import { logger } from "../config/logger.js";
+import { env } from "../config/env.js";
 
 export async function createUrlController(req, res) {
   // Validate incoming request body.
@@ -29,9 +30,7 @@ export async function createUrlController(req, res) {
   try {
     const url = await createUrl(validation.data.originalUrl, req.user.id);
 
-    const baseUrl = process.env.APP_BASE_URL || "http://localhost:3000";
-
-    const shortUrl = `${baseUrl.replace(/\/+$/, "")}/${url.shortCode}`;
+    const shortUrl = `${env.appBaseUrl}/${url.shortCode}`;
 
     return res.status(201).json({
       id: url.id,
@@ -99,7 +98,7 @@ export async function updateUrlController(req, res) {
       id: updatedUrl.id,
       shortCode: updatedUrl.shortCode,
       originalUrl: updatedUrl.originalUrl,
-      shortUrl: `${process.env.APP_BASE_URL}/${updatedUrl.shortCode}`,
+      shortUrl: `${env.appBaseUrl}/${updatedUrl.shortCode}`,
       createdAt: updatedUrl.createdAt,
       updatedAt: updatedUrl.updatedAt,
     });
